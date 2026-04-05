@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hiraya Staff Portal — Image Manager</title>
+<link rel="icon" type="image/png" href="https://hiraya-hotel.netlify.app/images/HIRAYA-VECTOR-LOGO.png">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --red: #D62B2B;
+    --red-deep: #A01E1E;
+    --red-light: #E84040;
+    --gold: #C9A84C;
+    --bg: #0A0A0A;
+    --bg2: #111111;
+    --bg3: #1C1C1C;
+    --bg4: #161616;
+    --text: #FAF7F4;
+    --text-s: rgba(250,247,244,0.65);
+    --text-m: rgba(250,247,244,0.38);
+    --border: rgba(255,255,255,0.07);
+    --border-red: rgba(214,43,43,0.3);
+    --shadow: 0 20px 60px rgba(0,0,0,0.7);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Montserrat', sans-serif; min-height: 100vh; overflow-x: hidden; }
+
+  /* ── LOGIN ── */
+  #loginScreen {
+    position: fixed; inset: 0; z-index: 999;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg);
+  }
+  #loginScreen::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 50% 50%, rgba(214,43,43,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .login-card {
+    background: var(--bg2); border: 1px solid var(--border-red); border-radius: 12px;
+    padding: 56px 48px; width: 100%; max-width: 420px; text-align: center;
+    position: relative; box-shadow: 0 30px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(214,43,43,0.1);
+    animation: fadeSlideUp 0.6s ease both;
+  }
+  .login-logo { height: 52px; margin-bottom: 32px; }
+  .login-eyebrow {
+    font-size: 9px; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--red); font-weight: 700; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .login-eyebrow::before, .login-eyebrow::after { content: ''; flex: 1; max-width: 30px; height: 1px; background: var(--red); }
+  .login-title { font-family: 'Cormorant Garamond', serif; font-size: 32px; font-weight: 300; color: var(--text); margin-bottom: 8px; line-height: 1.2; }
+  .login-title em { font-style: italic; color: var(--red-light); }
+  .login-sub { font-size: 12px; color: var(--text-m); margin-bottom: 36px; line-height: 1.7; }
+  .login-field { position: relative; margin-bottom: 16px; text-align: left; }
+  .login-field label { font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--text-m); display: block; margin-bottom: 8px; font-weight: 600; }
+  .login-field input {
+    width: 100%; padding: 14px 18px; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: 'Montserrat', sans-serif; font-size: 13px;
+    outline: none; transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .login-field input:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(214,43,43,0.12); }
+  .login-btn {
+    width: 100%; padding: 15px; background: var(--red); color: #fff; border: none;
+    border-radius: 6px; font-family: 'Montserrat', sans-serif; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase; font-weight: 700; cursor: pointer;
+    transition: background 0.3s, transform 0.2s, box-shadow 0.3s; margin-top: 8px;
+  }
+  .login-btn:hover { background: var(--red-deep); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(214,43,43,0.35); }
+  .login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .login-err { margin-top: 14px; font-size: 11px; color: var(--red-light); display: none; letter-spacing: 0.5px; }
+  .login-err.show { display: block; }
+  .login-note { margin-top: 24px; font-size: 10px; color: var(--text-m); letter-spacing: 0.5px; }
+
+  /* ── MAIN APP ── */
+  #app { display: none; min-height: 100vh; }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.95); backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(214,43,43,0.15);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 40px;
+  }
+  .topbar-left { display: flex; align-items: center; gap: 20px; }
+  .topbar-logo { height: 36px; }
+  .topbar-pill {
+    background: rgba(214,43,43,0.12); border: 1px solid rgba(214,43,43,0.25);
+    color: var(--red-light); padding: 4px 12px; border-radius: 20px;
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase; font-weight: 700;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 16px; }
+  .topbar-user { font-size: 11px; color: var(--text-m); }
+  .topbar-user strong { color: var(--text-s); }
+  .logout-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-m);
+    padding: 7px 16px; border-radius: 6px; font-size: 10px; letter-spacing: 1.5px;
+    text-transform: uppercase; font-weight: 600; cursor: pointer;
+    font-family: 'Montserrat', sans-serif; transition: border-color 0.3s, color 0.3s;
+  }
+  .logout-btn:hover { border-color: var(--red); color: var(--red-light); }
+  .preview-link {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 11px;
+    color: var(--text-m); text-decoration: none; border: 1px solid var(--border);
+    padding: 8px 16px; border-radius: 6px; transition: border-color 0.3s, color 0.3s; font-weight: 500;
+  }
+  .preview-link:hover { border-color: var(--gold); color: var(--gold); }
+
+  .app-wrap { max-width: 1200px; margin: 0 auto; padding: 48px 40px 80px; }
+  .page-header { margin-bottom: 48px; }
+  .page-label { font-size: 9px; letter-spacing: 4px; text-transform: uppercase; color: var(--red); font-weight: 700; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .page-label::before { content: ''; width: 20px; height: 1px; background: var(--red); }
+  .page-title { font-family: 'Cormorant Garamond', serif; font-size: 48px; font-weight: 300; line-height: 1.1; }
+  .page-title em { font-style: italic; color: var(--red-light); }
+  .page-desc { font-size: 13px; color: var(--text-s); line-height: 1.8; margin-top: 12px; max-width: 560px; }
+
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 48px; }
+  .stat-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; transition: border-color 0.3s; }
+  .stat-box:hover { border-color: var(--border-red); }
+  .stat-num { font-family: 'Cormorant Garamond', serif; font-size: 36px; font-weight: 600; color: var(--red); line-height: 1; }
+  .stat-lbl { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text-m); margin-top: 6px; font-weight: 600; }
+
+  /* Section groups */
+  .section-group { margin-bottom: 56px; animation: fadeSlideUp 0.5s ease both; }
+  .section-group:nth-child(1){animation-delay:.05s} .section-group:nth-child(2){animation-delay:.1s}
+  .section-group:nth-child(3){animation-delay:.15s} .section-group:nth-child(4){animation-delay:.2s}
+  .section-group:nth-child(5){animation-delay:.25s} .section-group:nth-child(6){animation-delay:.3s}
+  .section-group-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .section-group-icon { font-size: 22px; }
+  .section-group-title { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 600; color: var(--text); }
+  .section-group-count { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-m); background: var(--bg3); padding: 4px 10px; border-radius: 12px; }
+
+  /* Image cards */
+  .img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+  .img-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+  }
+  .img-card:hover { border-color: var(--border-red); box-shadow: var(--shadow); transform: translateY(-3px); }
+  .img-card.featured { grid-column: span 2; }
+
+  .img-preview-wrap { position: relative; overflow: hidden; }
+  .img-preview { width: 100%; height: 180px; object-fit: cover; display: block; transition: transform 0.4s; }
+  .img-card.featured .img-preview { height: 260px; }
+  .img-card:hover .img-preview { transform: scale(1.04); }
+
+  .img-status {
+    position: absolute; top: 10px; right: 10px; padding: 4px 10px; border-radius: 12px;
+    font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 700; backdrop-filter: blur(8px);
+  }
+  .img-status.original { background: rgba(10,10,10,0.75); color: rgba(250,247,244,0.6); border: 1px solid rgba(255,255,255,0.1); }
+  .img-status.custom { background: rgba(201,168,76,0.2); color: var(--gold); border: 1px solid rgba(201,168,76,0.35); }
+  .img-status.featured-badge { top: 10px; left: 10px; right: auto; background: rgba(214,43,43,0.85); color: #fff; border: none; }
+
+  /* Loading skeleton */
+  .img-skeleton { width: 100%; height: 180px; background: linear-gradient(90deg, var(--bg3) 25%, var(--bg4) 50%, var(--bg3) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+  .img-card.featured .img-skeleton { height: 260px; }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  .img-card-body { padding: 18px 20px 20px; }
+  .img-card-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .img-card-desc { font-size: 11px; color: var(--text-m); margin-bottom: 16px; line-height: 1.5; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 1.5px dashed rgba(214,43,43,0.3); border-radius: 8px; padding: 18px;
+    text-align: center; cursor: pointer; transition: border-color 0.3s, background 0.3s;
+    position: relative; background: rgba(214,43,43,0.02);
+  }
+  .upload-zone:hover, .upload-zone.dragover { border-color: var(--red); background: rgba(214,43,43,0.06); }
+  .upload-zone.uploading { border-color: var(--gold); background: rgba(201,168,76,0.05); pointer-events: none; }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .upload-icon { font-size: 20px; margin-bottom: 6px; }
+  .upload-text { font-size: 11px; color: var(--text-s); line-height: 1.5; }
+  .upload-text strong { color: var(--red-light); display: block; font-size: 10px; letter-spacing: 1px; margin-bottom: 2px; }
+  .upload-hint { font-size: 9px; color: var(--text-m); margin-top: 4px; }
+
+  /* Progress bar */
+  .upload-progress { height: 3px; background: var(--bg3); border-radius: 2px; margin-top: 10px; overflow: hidden; display: none; }
+  .upload-progress-bar { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.3s; width: 0%; }
+  .upload-zone.uploading .upload-progress { display: block; }
+
+  /* URL input */
+  .url-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 10px; font-size: 10px; color: var(--text-m); cursor: pointer;
+    transition: color 0.3s; background: none; border: none;
+    font-family: 'Montserrat', sans-serif; width: 100%; letter-spacing: 1px;
+  }
+  .url-toggle:hover { color: var(--red-light); }
+  .url-input-wrap { margin-top: 10px; display: none; }
+  .url-input-wrap.show { display: flex; gap: 6px; }
+  .url-input {
+    flex: 1; padding: 9px 12px; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: 'Montserrat', sans-serif;
+    font-size: 11px; outline: none; transition: border-color 0.3s;
+  }
+  .url-input:focus { border-color: var(--red); }
+  .url-input::placeholder { color: var(--text-m); }
+  .url-apply {
+    padding: 9px 14px; background: var(--red); color: #fff; border: none;
+    border-radius: 6px; font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer; font-family: 'Montserrat', sans-serif;
+    transition: background 0.3s; white-space: nowrap;
+  }
+  .url-apply:hover { background: var(--red-deep); }
+
+  /* Actions */
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-reset {
+    flex: 1; padding: 9px; background: none; color: var(--text-m);
+    border: 1px solid var(--border); border-radius: 6px; font-size: 10px;
+    letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; cursor: pointer;
+    font-family: 'Montserrat', sans-serif; transition: border-color 0.3s, color 0.3s;
+  }
+  .btn-reset:hover { border-color: var(--red); color: var(--red-light); }
+  .btn-reset:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Flash */
+  .flash-msg {
+    position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg3); border: 1px solid rgba(201,168,76,0.4); color: var(--gold);
+    padding: 14px 28px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    letter-spacing: 1px; z-index: 500; opacity: 0; transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .flash-msg.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Reset all */
+  .reset-all-section {
+    margin-top: 64px; padding: 32px; background: var(--bg2);
+    border: 1px solid rgba(214,43,43,0.15); border-radius: 10px;
+    display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;
+  }
+  .reset-all-text h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .reset-all-text p { font-size: 12px; color: var(--text-m); line-height: 1.6; }
+  .btn-reset-all {
+    padding: 13px 28px; background: none; border: 1px solid rgba(214,43,43,0.4);
+    color: var(--red-light); border-radius: 6px; font-size: 10px; letter-spacing: 2.5px;
+    text-transform: uppercase; font-weight: 700; cursor: pointer;
+    font-family: 'Montserrat', sans-serif; transition: background 0.3s, border-color 0.3s, color 0.3s; white-space: nowrap;
+  }
+  .btn-reset-all:hover { background: var(--red); border-color: var(--red); color: #fff; }
+
+  /* Supabase status dot */
+  .sb-status { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--text-m); }
+  .sb-dot { width: 7px; height: 7px; border-radius: 50%; background: #666; }
+  .sb-dot.connected { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.5); }
+  .sb-dot.error { background: var(--red); }
+
+  @keyframes fadeSlideUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+  @media(max-width:768px){
+    .topbar{padding:12px 20px}
+    .app-wrap{padding:32px 20px 60px}
+    .stats-row{grid-template-columns:repeat(2,1fr)}
+    .img-card.featured{grid-column:span 1}
+    .reset-all-section{flex-direction:column}
+    .page-title{font-size:34px}
+    .topbar-user{display:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <img class="login-logo" src="https://hiraya-hotel.netlify.app/images/HIRAYA-VECTOR-LOGO-WITH-TEXT.png" alt="Hiraya Hotel">
+    <div class="login-eyebrow">Staff Portal</div>
+    <h1 class="login-title">Image <em>Manager</em></h1>
+    <p class="login-sub">Restricted to authorized Hiraya Hotel staff only. Changes apply instantly for all website visitors.</p>
+    <div class="login-field">
+      <label>Username</label>
+      <input type="text" id="loginUser" placeholder="Enter your username" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="Enter your password" autocomplete="current-password">
+    </div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">Access Staff Portal</button>
+    <div class="login-err" id="loginErr">⚠ Incorrect credentials. Please try again.</div>
+    <p class="login-note">🔒 Powered by Supabase · Changes are live for all visitors</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-left">
+      <img class="topbar-logo" src="https://hiraya-hotel.netlify.app/images/HIRAYA-VECTOR-LOGO-WITH-TEXT.png" alt="Hiraya">
+      <span class="topbar-pill">Staff Portal</span>
+      <div class="sb-status"><div class="sb-dot" id="sbDot"></div><span id="sbStatus">Connecting…</span></div>
+    </div>
+    <div class="topbar-right">
+      <a href="index.html" target="_blank" class="preview-link">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Preview Site
+      </a>
+      <span class="topbar-user">Logged in as <strong id="loggedInName">—</strong></span>
+      <button class="logout-btn" onclick="doLogout()">Log Out</button>
+    </div>
+  </div>
+
+  <div class="app-wrap">
+    <div class="page-header">
+      <div class="page-label">Image Manager</div>
+      <h1 class="page-title">Manage your <em>website</em> images</h1>
+      <p class="page-desc">Upload new photos or paste image URLs to update any section of the Hiraya website. Changes go live instantly for every visitor — no rebuild needed.</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="statTotal">—</div><div class="stat-lbl">Total Images</div></div>
+      <div class="stat-box"><div class="stat-num" id="statCustom">—</div><div class="stat-lbl">Customized</div></div>
+      <div class="stat-box"><div class="stat-num" id="statOriginal">—</div><div class="stat-lbl">Using Original</div></div>
+      <div class="stat-box"><div class="stat-num" id="statSections">—</div><div class="stat-lbl">Sections</div></div>
+    </div>
+
+    <div id="sectionsWrap"></div>
+
+    <div class="reset-all-section">
+      <div class="reset-all-text">
+        <h3>Reset All Images</h3>
+        <p>Restore all images back to the original defaults. This removes all custom images from the database and affects all visitors immediately.</p>
+      </div>
+      <button class="btn-reset-all" onclick="resetAll()">Reset Everything to Default</button>
+    </div>
+  </div>
+</div>
+
+<div class="flash-msg" id="flashMsg">✓ Image updated</div>
+
+<script>
+// ─── SUPABASE CONFIG ───────────────────────────────────────
+const SUPABASE_URL  = 'https://zewgufulkdcilcbqllsf.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpld2d1ZnVsa2RjaWxjYnFsbHNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMjk0ODMsImV4cCI6MjA5MDkwNTQ4M30.bAHLkluY29rHhNXCmKt6EeHmS4Qn3cdsYhYiRMo9ARU';
+const BUCKET        = 'site-images';
+const sb            = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ─── STAFF ACCOUNTS ────────────────────────────────────────
+// Change these credentials as needed
+const STAFF_ACCOUNTS = [
+  { username: 'hiraya.admin', password: 'HirayaStaff2025!', displayName: 'Admin' },
+  { username: 'hiraya.staff', password: 'Staff@Hiraya25',   displayName: 'Front Desk Staff' },
+];
+
+// ─── IMAGE DEFINITIONS ─────────────────────────────────────
+const IMAGE_SECTIONS = [
+  {
+    id: 'hero', label: 'Hero / Banner', icon: '🏠',
+    images: [
+      { key: 'img_hero_bg', name: 'Hero Background', desc: 'Full-screen banner image behind the main tagline', featured: true,
+        default: 'https://hiraya-hotel.netlify.app/images/family-suite.webp' },
+    ]
+  },
+  {
+    id: 'about', label: 'About Section', icon: '🌿',
+    images: [
+      { key: 'img_about_main',   name: 'About — Main Photo',   desc: 'Large photo on the left side of the About section',
+        default: 'https://hiraya-hotel.netlify.app/images/deluxe-king.webp' },
+      { key: 'img_about_accent', name: 'About — Accent Photo', desc: 'Smaller overlapping photo (hidden on mobile)',
+        default: 'https://hiraya-hotel.netlify.app/images/deluxe-single.webp' },
+    ]
+  },
+  {
+    id: 'rooms', label: 'Room Photos', icon: '🛏️',
+    images: [
+      { key: 'img_room_deluxe_king',   name: 'Deluxe King',         desc: 'Rooms 204–207 — featured room (large card)', featured: true,
+        default: 'https://hiraya-hotel.netlify.app/images/deluxe-king.webp' },
+      { key: 'img_room_deluxe_single', name: 'Deluxe Single',       desc: 'Rooms 201, 202, 208, 211, 213',
+        default: 'https://hiraya-hotel.netlify.app/images/deluxe-single.webp' },
+      { key: 'img_room_bunk',          name: 'Bunk Room',           desc: 'Room 209',
+        default: 'https://hiraya-hotel.netlify.app/images/bunk-room.webp' },
+      { key: 'img_room_junior_family', name: 'Junior Family Suite', desc: 'Rooms 210, 215',
+        default: 'https://hiraya-hotel.netlify.app/images/junior-family.webp' },
+      { key: 'img_room_family_suite',  name: 'Family Suite',        desc: 'Rooms 212, 214 — Best Value badge',
+        default: 'https://hiraya-hotel.netlify.app/images/family-suite.webp' },
+    ]
+  },
+  {
+    id: 'venue', label: 'Venue Brochure', icon: '🎉',
+    images: [
+      { key: 'img_venue_brochure', name: 'Venue Brochure', desc: 'Clickable brochure image in the Venue section',
+        default: 'https://hiraya-hotel.netlify.app/images/hiraya-brochure copy.png' },
+    ]
+  },
+  {
+    id: 'packages', label: 'Package Cards', icon: '🎁',
+    images: [
+      { key: 'img_pkg_1', name: 'Package 1', desc: 'First package card image',
+        default: "https://hiraya-hotel.netlify.app/images/packagesArtboard 1.jpg" },
+      { key: 'img_pkg_2', name: 'Package 2', desc: 'Second package card image',
+        default: "https://hiraya-hotel.netlify.app/images/packagesArtboard 1 copy.jpg" },
+      { key: 'img_pkg_3', name: 'Package 3', desc: 'Third package card image',
+        default: "https://hiraya-hotel.netlify.app/images/packagesArtboard 1 copy 2.jpg" },
+      { key: 'img_pkg_4', name: 'Package 4', desc: 'Fourth package card image',
+        default: "https://hiraya-hotel.netlify.app/images/packagesArtboard 1 copy 3.jpg" },
+    ]
+  },
+  {
+    id: 'breakfast', label: 'Breakfast Menu Photos', icon: '🍳',
+    images: [
+      { key: 'img_bfast_1', name: 'Breakfast Photo 1', desc: 'First breakfast menu image',
+        default: 'https://hiraya-hotel.netlify.app/images/bfast1.png' },
+      { key: 'img_bfast_2', name: 'Breakfast Photo 2', desc: 'Second breakfast menu image',
+        default: 'https://hiraya-hotel.netlify.app/images/bfast2.png' },
+      { key: 'img_bfast_3', name: 'Breakfast Photo 3', desc: 'Third breakfast menu image',
+        default: 'https://hiraya-hotel.netlify.app/images/bfast3.png' },
+    ]
+  },
+];
+
+// ─── STATE ─────────────────────────────────────────────────
+let dbImages = {}; // key -> url from Supabase
+
+// ─── SUPABASE HELPERS ──────────────────────────────────────
+async function loadAllImages() {
+  const { data, error } = await sb.from('site_images').select('key, url');
+  if (error) { console.error('Load error:', error); return; }
+  dbImages = {};
+  (data || []).forEach(row => { dbImages[row.key] = row.url; });
+}
+
+async function saveImage(key, url) {
+  const { error } = await sb.from('site_images').upsert({ key, url, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  if (error) throw error;
+  dbImages[key] = url;
+}
+
+async function deleteImage(key) {
+  const { error } = await sb.from('site_images').delete().eq('key', key);
+  if (error) throw error;
+  delete dbImages[key];
+}
+
+async function uploadToStorage(file, key) {
+  const ext  = file.name.split('.').pop().toLowerCase();
+  const path = `${key}-${Date.now()}.${ext}`;
+  const { data, error } = await sb.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: file.type });
+  if (error) throw error;
+  const { data: pub } = sb.storage.from(BUCKET).getPublicUrl(path);
+  return pub.publicUrl;
+}
+
+// ─── AUTH ──────────────────────────────────────────────────
+function doLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const btn  = document.getElementById('loginBtn');
+  const account = STAFF_ACCOUNTS.find(a => a.username === user && a.password === pass);
+  if (account) {
+    sessionStorage.setItem('hiraya_staff', JSON.stringify({ user, name: account.displayName }));
+    showApp(account.displayName);
+  } else {
+    const err = document.getElementById('loginErr');
+    err.classList.add('show');
+    setTimeout(() => err.classList.remove('show'), 3500);
+  }
+}
+function doLogout() {
+  sessionStorage.removeItem('hiraya_staff');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+}
+async function showApp(name) {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('loggedInName').textContent = name;
+  await initSupabase();
+  renderSections();
+  updateStats();
+}
+
+// ─── SUPABASE INIT & STATUS ────────────────────────────────
+async function initSupabase() {
+  const dot = document.getElementById('sbDot');
+  const lbl = document.getElementById('sbStatus');
+  try {
+    await loadAllImages();
+    dot.className = 'sb-dot connected';
+    lbl.textContent = 'Connected to Supabase';
+  } catch(e) {
+    dot.className = 'sb-dot error';
+    lbl.textContent = 'Connection error';
+  }
+}
+
+// ─── RENDER ────────────────────────────────────────────────
+function getEffectiveSrc(key, def) { return dbImages[key] || def; }
+function isCustom(key) { return !!dbImages[key]; }
+
+function renderSections() {
+  const wrap = document.getElementById('sectionsWrap');
+  wrap.innerHTML = '';
+  IMAGE_SECTIONS.forEach(section => {
+    const group = document.createElement('div');
+    group.className = 'section-group';
+    group.innerHTML = `
+      <div class="section-group-header">
+        <span class="section-group-icon">${section.icon}</span>
+        <span class="section-group-title">${section.label}</span>
+        <span class="section-group-count">${section.images.length} image${section.images.length > 1 ? 's' : ''}</span>
+      </div>
+      <div class="img-grid" id="grid_${section.id}"></div>
+    `;
+    wrap.appendChild(group);
+    const grid = document.getElementById('grid_' + section.id);
+    section.images.forEach(img => grid.appendChild(buildCard(img)));
+  });
+}
+
+function buildCard(img) {
+  const custom = isCustom(img.key);
+  const src    = getEffectiveSrc(img.key, img.default);
+
+  const card = document.createElement('div');
+  card.className = 'img-card' + (img.featured ? ' featured' : '');
+  card.id = 'card_' + img.key;
+  card.innerHTML = `
+    <div class="img-preview-wrap">
+      <img class="img-preview" id="preview_${img.key}" src="${src}" alt="${img.name}" onerror="this.style.opacity='.3'">
+      ${img.featured ? `<span class="img-status featured-badge">Featured</span>` : ''}
+      <span class="img-status ${custom ? 'custom' : 'original'}" id="badge_${img.key}">${custom ? '✦ Custom' : 'Original'}</span>
+    </div>
+    <div class="img-card-body">
+      <div class="img-card-name">${img.name}</div>
+      <div class="img-card-desc">${img.desc}</div>
+
+      <div class="upload-zone" id="zone_${img.key}">
+        <input type="file" accept="image/*" onchange="handleFile(event,'${img.key}','${img.default.replace(/'/g,"\\'")}')">
+        <div class="upload-icon" id="zoneIcon_${img.key}">📁</div>
+        <div class="upload-text"><strong>Click or drag to upload</strong>JPG, PNG, WEBP — max 5 MB</div>
+        <div class="upload-hint" id="zoneHint_${img.key}">${custom ? '⟳ Replace current custom image' : 'No custom image — using original'}</div>
+        <div class="upload-progress"><div class="upload-progress-bar" id="prog_${img.key}"></div></div>
+      </div>
+
+      <button class="url-toggle" onclick="toggleUrl('${img.key}')">🔗 &nbsp; Use image URL instead</button>
+      <div class="url-input-wrap" id="urlWrap_${img.key}">
+        <input class="url-input" type="url" id="urlInput_${img.key}" placeholder="https://example.com/image.jpg">
+        <button class="url-apply" onclick="applyUrl('${img.key}','${img.default.replace(/'/g,"\\'")}')">Apply</button>
+      </div>
+
+      <div class="card-actions">
+        <button class="btn-reset" id="resetBtn_${img.key}" onclick="resetImg('${img.key}')" ${!custom ? 'disabled' : ''}>↺ Restore Default</button>
+      </div>
+    </div>
+  `;
+
+  // Drag events
+  const zone = card.querySelector('.upload-zone');
+  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', ()  => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file, img.key, img.default);
+  });
+  return card;
+}
+
+function refreshCard(key) {
+  const allImgs = IMAGE_SECTIONS.flatMap(s => s.images);
+  const img = allImgs.find(i => i.key === key);
+  if (!img) return;
+  const card = document.getElementById('card_' + key);
+  if (card) card.replaceWith(buildCard(img));
+}
+
+// ─── IMAGE HANDLING ────────────────────────────────────────
+function handleFile(event, key, defaultSrc) {
+  const file = event.target.files[0];
+  if (file) processFile(file, key, defaultSrc);
+}
+
+async function processFile(file, key, defaultSrc) {
+  if (file.size > 5 * 1024 * 1024) { flash('⚠ File too large — max 5 MB', true); return; }
+
+  const zone = document.getElementById('zone_' + key);
+  const prog = document.getElementById('prog_' + key);
+  const icon = document.getElementById('zoneIcon_' + key);
+
+  zone.classList.add('uploading');
+  icon.textContent = '⏳';
+  prog.style.width = '30%';
+
+  try {
+    prog.style.width = '60%';
+    const publicUrl = await uploadToStorage(file, key);
+    prog.style.width = '85%';
+    await saveImage(key, publicUrl);
+    prog.style.width = '100%';
+    setTimeout(() => {
+      zone.classList.remove('uploading');
+      icon.textContent = '📁';
+      refreshCard(key);
+      updateStats();
+      flash('✓ Image uploaded & live on website');
+    }, 400);
+  } catch(err) {
+    zone.classList.remove('uploading');
+    icon.textContent = '📁';
+    prog.style.width = '0%';
+    flash('⚠ Upload failed: ' + (err.message || 'Unknown error'), true);
+    console.error(err);
+  }
+}
+
+function toggleUrl(key) {
+  document.getElementById('urlWrap_' + key).classList.toggle('show');
+}
+
+async function applyUrl(key, defaultSrc) {
+  const url = document.getElementById('urlInput_' + key).value.trim();
+  if (!url) { flash('⚠ Please enter a URL', true); return; }
+  if (!url.startsWith('http')) { flash('⚠ URL must start with https://', true); return; }
+  try {
+    await saveImage(key, url);
+    refreshCard(key);
+    updateStats();
+    flash('✓ URL applied — live for all visitors');
+  } catch(err) {
+    flash('⚠ Failed to save: ' + (err.message || 'Unknown error'), true);
+  }
+}
+
+async function resetImg(key) {
+  if (!confirm('Restore this image to the original default? Your custom image will be removed.')) return;
+  try {
+    await deleteImage(key);
+    refreshCard(key);
+    updateStats();
+    flash('↺ Image restored to default');
+  } catch(err) {
+    flash('⚠ Failed to reset: ' + err.message, true);
+  }
+}
+
+async function resetAll() {
+  if (!confirm('Reset ALL images to defaults? This affects all visitors immediately and cannot be undone.')) return;
+  try {
+    const allKeys = IMAGE_SECTIONS.flatMap(s => s.images.map(i => i.key));
+    for (const key of allKeys) {
+      if (dbImages[key]) await deleteImage(key);
+    }
+    renderSections();
+    updateStats();
+    flash('↺ All images restored to defaults');
+  } catch(err) {
+    flash('⚠ Reset failed: ' + err.message, true);
+  }
+}
+
+// ─── STATS ─────────────────────────────────────────────────
+function updateStats() {
+  const all    = IMAGE_SECTIONS.flatMap(s => s.images);
+  const custom = all.filter(i => isCustom(i.key)).length;
+  document.getElementById('statTotal').textContent    = all.length;
+  document.getElementById('statCustom').textContent   = custom;
+  document.getElementById('statOriginal').textContent = all.length - custom;
+  document.getElementById('statSections').textContent = IMAGE_SECTIONS.length;
+}
+
+// ─── FLASH ─────────────────────────────────────────────────
+let flashTimer;
+function flash(msg, warn) {
+  const el = document.getElementById('flashMsg');
+  el.textContent = msg;
+  el.style.borderColor = warn ? 'rgba(214,43,43,0.4)' : 'rgba(201,168,76,0.4)';
+  el.style.color = warn ? 'var(--red-light)' : 'var(--gold)';
+  el.classList.add('show');
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ─── INIT ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  ['loginUser','loginPass'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  });
+  const auth = sessionStorage.getItem('hiraya_staff');
+  if (auth) showApp(JSON.parse(auth).name);
+});
+</script>
+</body>
+</html>
